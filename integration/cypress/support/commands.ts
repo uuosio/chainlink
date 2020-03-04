@@ -15,6 +15,7 @@ Cypress.Commands.add('clickLink', linkText => {
 })
 
 Cypress.Commands.add('clickButton', buttonText => {
+  console.log('test')
   cy.contains('button', buttonText).click()
 })
 
