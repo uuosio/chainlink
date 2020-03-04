@@ -1,8 +1,6 @@
-FROM henrynguyen5/base:1.0.2 as builder
+FROM henrynguyen5/base:1.0.3 as builder
 
-RUN mkdir -p /usr/src/app
-WORKDIR /usr/src/app
-ENV PATH /usr/src/app/node_modules/.bin:$PATH
+ENV PATH /chainlink/node_modules/.bin:$PATH
 
 ADD . .
 
@@ -14,20 +12,20 @@ FROM node:10.16.3-alpine
 
 WORKDIR /app
 
-COPY --from=builder /usr/src/app/package.json package.json
-COPY --from=builder /usr/src/app/yarn.lock yarn.lock
-COPY --from=builder /usr/src/app/node_modules node_modules
-COPY --from=builder /usr/src/app/explorer/node_modules explorer/node_modules
-COPY --from=builder /usr/src/app/explorer/package.json explorer/package.json
-COPY --from=builder /usr/src/app/explorer/src explorer/src
-COPY --from=builder /usr/src/app/explorer/tsconfig.json explorer/tsconfig.json
-COPY --from=builder /usr/src/app/tsconfig.cjs.json ./
-COPY --from=builder /usr/src/app/explorer/ormconfig.json explorer/ormconfig.json
-COPY --from=builder /usr/src/app/explorer/client/public explorer/client/public
-COPY --from=builder /usr/src/app/explorer/client/build explorer/client/build
-COPY --from=builder /usr/src/app/styleguide styleguide
-COPY --from=builder /usr/src/app/tools/json-api-client tools/json-api-client
-COPY --from=builder /usr/src/app/tools/redux tools/redux
+COPY --from=builder /chainlink/package.json package.json
+COPY --from=builder /chainlink/yarn.lock yarn.lock
+COPY --from=builder /chainlink/node_modules node_modules
+COPY --from=builder /chainlink/explorer/node_modules explorer/node_modules
+COPY --from=builder /chainlink/explorer/package.json explorer/package.json
+COPY --from=builder /chainlink/explorer/src explorer/src
+COPY --from=builder /chainlink/explorer/tsconfig.json explorer/tsconfig.json
+COPY --from=builder /chainlink/tsconfig.cjs.json ./
+COPY --from=builder /chainlink/explorer/ormconfig.json explorer/ormconfig.json
+COPY --from=builder /chainlink/explorer/client/public explorer/client/public
+COPY --from=builder /chainlink/explorer/client/build explorer/client/build
+COPY --from=builder /chainlink/styleguide styleguide
+COPY --from=builder /chainlink/tools/json-api-client tools/json-api-client
+COPY --from=builder /chainlink/tools/redux tools/redux
 
 ENV NODE_ENV production
 ENTRYPOINT [ "yarn", "workspace", "@chainlink/explorer", "run", "prod" ]
