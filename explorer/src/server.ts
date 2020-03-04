@@ -1,13 +1,13 @@
-import cookieSession from 'cookie-session'
 import express from 'express'
 import helmet from 'helmet'
 import http from 'http'
 import mime from 'mime-types'
+import cookieSession from 'cookie-session'
+import adminAuth from './middleware/adminAuth'
 import * as controllers from './controllers'
 import { addRequestLogging, logger } from './logging'
-import adminAuth from './middleware/adminAuth'
-import seed from './seed'
 import { bootstrapRealtime } from './server/realtime'
+import seed from './seed'
 
 export const DEFAULT_PORT = parseInt(process.env.SERVER_PORT, 10) || 8080
 export const COOKIE_EXPIRATION_MS = 86400000 // 1 day in ms
@@ -29,7 +29,6 @@ const server = (port: number = DEFAULT_PORT): http.Server => {
     }),
   )
   app.use(express.json())
-  console.log('test')
   app.use(
     express.static('client/build', {
       maxAge: '1y',

@@ -51,7 +51,6 @@ func ExampleRun() {
 	//    --json, -j     json output as opposed to table
 	//    --help, -h     show help
 	//    --version, -v  print the version
-	//   console.log('test')
 }
 
 func ExampleVersion() {

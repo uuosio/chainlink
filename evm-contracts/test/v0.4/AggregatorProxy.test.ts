@@ -28,8 +28,6 @@ beforeAll(async () => {
 })
 
 describe('AggregatorProxy', () => {
-  console.log('test')
-
   const jobId1 =
     '0x4c7b7ffb66b344fbaa64995af81e355a00000000000000000000000000000001'
   const deposit = h.toWei('100')
