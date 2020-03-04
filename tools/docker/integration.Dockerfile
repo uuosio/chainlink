@@ -1,4 +1,4 @@
-FROM henrynguyen5/base:1.0.0
+FROM henrynguyen5/base:1.0.1
 
 # Install docker and docker compose
 RUN apt-get update \
