@@ -129,6 +129,15 @@ export type FetchAdminHeadSucceededAction = {
 }
 
 /**
+ * FETCH_ADMIN_HEAD_ERROR
+ */
+
+export type FetchAdminHeadErrorAction = {
+  type: 'FETCH_ADMIN_HEAD_ERROR'
+  error: Error
+}
+
+/**
  * FETCH_JOB_RUNS_SUCCEEDED
  */
 
@@ -187,6 +196,7 @@ export type Actions =
   | FetchAdminOperatorSucceededAction
   | FetchAdminHeadsSucceededAction
   | FetchAdminHeadSucceededAction
+  | FetchAdminHeadErrorAction
   | FetchJobRunsSucceededAction
   | FetchJobRunSucceededAction
   | UpdateQueryAction
