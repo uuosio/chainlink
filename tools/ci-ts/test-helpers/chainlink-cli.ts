@@ -1,6 +1,8 @@
 import { ethers } from 'ethers'
 import execa from 'execa'
 import { JobSpec, JobRun } from '../../../operator_ui/@types/operator_ui'
+import crypto from 'crypto'
+import path from 'path'
 
 const API_CREDENTIALS_PATH = '/run/secrets/apicredentials'
 
@@ -13,11 +15,21 @@ interface KeyInfo {
   linkBalance: ethers.utils.BigNumber
 }
 
+const sha256 = (x: string) =>
+  crypto
+    .createHash('sha256')
+    .update(x, 'utf8')
+    .digest('hex')
+
 export default class ChainlinkClient {
   chainlinkURL: string | undefined
+  root: string | undefined
 
   constructor(chainlinkURL?: string) {
-    this.chainlinkURL = chainlinkURL
+    if (chainlinkURL) {
+      this.chainlinkURL = chainlinkURL
+      this.root = path.join('~', sha256(chainlinkURL))
+    }
   }
 
   connect(chainlinkURL: string) {
@@ -28,45 +40,42 @@ export default class ChainlinkClient {
     if (!this.chainlinkURL) {
       throw Error('no chainlink node URL set')
     }
-    const { stdout } = execa.sync('chainlink', ['-j', ...command.split(' ')])
+    const commands = ['-j', ...command.split(' ')]
+    const { stdout } = execa.sync('chainlink', commands, this.execOptions())
     return stdout ? JSON.parse(stdout) : null
   }
 
   login(): void {
-    execa.sync('chainlink', ['admin', 'login', '--file', API_CREDENTIALS_PATH])
+    // execa.sync('chainlink', ['admin', 'login', '--file', API_CREDENTIALS_PATH])
+    this.execute(`admin login --file ${API_CREDENTIALS_PATH}`)
   }
 
   getJobs(): JobSpec[] {
-    // const { stdout } = execa.sync('chainlink', ['-j', 'jobs', 'list'])
-    // return JSON.parse(stdout) as JobSpec[]
     return this.execute('jobs list') as JobSpec[]
   }
 
   getJobRuns(): JobRun[] {
-    // const { stdout } = execa.sync('chainlink', ['-j', 'runs', 'list'])
-    // return JSON.parse(stdout) as JobRun[]
     return this.execute('runs list') as JobRun[]
   }
 
   createJob(jobSpec: string): JobSpec {
-    // const { stdout } = execa.sync('chainlink', [
-    //   '-j',
-    //   'jobs',
-    //   'create',
-    //   jobSpec,
-    // ])
-    // return JSON.parse(stdout) as JobSpec
     return this.execute(`jobs create ${jobSpec}`) as JobSpec
   }
 
   archiveJob(jobId: string): void {
-    // execa.sync('chainlink', ['-j', 'jobs', 'archive', jobId])
     this.execute(`jobs archive ${jobId}`)
   }
 
   getAdminInfo(): KeyInfo[] {
-    // const { stdout } = execa.sync('chainlink', ['-j', 'admin', 'info'])
-    // return JSON.parse(stdout) as KeyInfo[]
     return this.execute('admin info') as KeyInfo[]
+  }
+
+  private execOptions(): execa.SyncOptions {
+    return {
+      env: {
+        CLIENT_NODE_URL: this.chainlinkURL,
+        ROOT: this.root,
+      },
+    }
   }
 }
