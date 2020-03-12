@@ -15,11 +15,13 @@ interface KeyInfo {
   linkBalance: ethers.utils.BigNumber
 }
 
-const sha256 = (x: string) =>
-  crypto
+function hashString(x: string): string {
+  return crypto
     .createHash('sha256')
     .update(x, 'utf8')
     .digest('hex')
+    .slice(0, 16)
+}
 
 export default class ChainlinkClient {
   chainlinkURL: string | undefined
@@ -28,7 +30,8 @@ export default class ChainlinkClient {
   constructor(chainlinkURL?: string) {
     if (chainlinkURL) {
       this.chainlinkURL = chainlinkURL
-      this.root = path.join('~', sha256(chainlinkURL))
+      // make the root directory unique to the the URL and deterministic
+      this.root = path.join('~', hashString(chainlinkURL))
     }
   }
 
