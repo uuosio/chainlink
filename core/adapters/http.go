@@ -35,6 +35,11 @@ type HTTPGet struct {
 	ExtendedPath ExtendedPath    `json:"extPath"`
 }
 
+// TaskType returns the type of Adapter.
+func (h *HTTPGet) TaskType() models.TaskType {
+	return TaskTypeHTTPGet
+}
+
 // Perform ensures that the adapter's URL responds to a GET request without
 // errors and returns the response body as the "value" field of the result.
 func (hga *HTTPGet) Perform(input models.RunInput, store *store.Store) models.RunOutput {
@@ -73,6 +78,11 @@ type HTTPPost struct {
 	QueryParams  QueryParameters `json:"queryParams"`
 	Body         *string         `json:"body,omitempty"`
 	ExtendedPath ExtendedPath    `json:"extPath"`
+}
+
+// TaskType returns the type of Adapter.
+func (h *HTTPPost) TaskType() models.TaskType {
+	return TaskTypeHTTPPost
 }
 
 // Perform ensures that the adapter's URL responds to a POST request without
