@@ -19,24 +19,24 @@ services:
       - MINIMUM_CONTRACT_PAYMENT
       - RUST_BACKTRACE
       - CHAINLINK_DEV
-      - EXPLORER_URL
-      - EXPLORER_ACCESS_KEY
-      - EXPLORER_SECRET
+      # - EXPLORER_URL
+      # - EXPLORER_ACCESS_KEY
+      # - EXPLORER_SECRET
       - SECURE_COOKIES
       - CHAINLINK_TLS_PORT
     env_file:
       - chainlink-variables.env
     ports:
       - 6688:6688
-    depends_on:
-      - explorer
+    # depends_on:
+    #   - explorer
     secrets:
       - node_password
       - apicredentials
       - keystore
 
   node-2:
-    container_name: chainlink-node
+    container_name: chainlink-node-2
     image: smartcontract/chainlink
     build:
       context: ../../
@@ -56,16 +56,16 @@ services:
       # - EXPLORER_URL
       # - EXPLORER_ACCESS_KEY
       # - EXPLORER_SECRET
-      - CHAINLINK_PORT=6699
-      - CHAINLINK_URL=CHAINLINK_URL=http://node-2:6699
+      # - CHAINLINK_PORT=6699
+      # - CHAINLINK_URL=CHAINLINK_URL=http://node-2:6699
       - SECURE_COOKIES
       - CHAINLINK_TLS_PORT
     env_file:
       - chainlink-variables.env
     ports:
-      - 6688:6688
-    depends_on:
-      - explorer
+      - 6699:6688
+    # depends_on:
+    #   - explorer
     secrets:
       - node_password
       - apicredentials
@@ -99,6 +99,10 @@ services:
     environment:
       POSTGRES_DB: $EXPLORER_DB_NAME
       POSTGRES_PASSWORD: $EXPLORER_PGPASSWORD
+
+# TODO
+# - replace clroot with secrets
+# - extract explorer and tools into separate docker-compose files
 
 secrets:
   node_password:
