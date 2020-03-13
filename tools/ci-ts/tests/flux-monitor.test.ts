@@ -63,6 +63,34 @@ async function assertJobRun(
   }, errorMessage)
 }
 
+async function assertAggregatorValues(
+  _la: number,
+  _lr: number,
+  _rr: number,
+  _ls1: number,
+  _ls2: number,
+  _w1: number,
+  _w2: number,
+  message: string,
+): Promise<void> {
+  const [la, lr, rr, ls1, ls2, w1, w2] = await Promise.all([
+    fluxAggregator.latestAnswer(),
+    fluxAggregator.latestRound(),
+    fluxAggregator.reportingRound(),
+    fluxAggregator.latestSubmission(node1Address).then(res => res[1]),
+    fluxAggregator.latestSubmission(node2Address).then(res => res[1]),
+    fluxAggregator.withdrawable(node1Address),
+    fluxAggregator.withdrawable(node2Address),
+  ])
+  matchers.bigNum(_la, la, `${message}: latest answer`)
+  matchers.bigNum(_lr, lr, `${message}: latest round`)
+  matchers.bigNum(_rr, rr, `${message}: reporting round`)
+  matchers.bigNum(_ls1, ls1, `${message}: node 1 latest submission`)
+  matchers.bigNum(_ls2, ls2, `${message}: node 2 latest submission`)
+  matchers.bigNum(_w1, w1, `${message}: node 1 withdrawable amount`)
+  matchers.bigNum(_w2, w2, `${message}: node 2 withdrawable amount`)
+}
+
 beforeAll(async () => {
   clClient1.login()
   clClient2.login()
@@ -83,9 +111,11 @@ beforeEach(async () => {
     1,
     ethers.utils.formatBytes32String('ETH/USD'),
   )
-  await fluxAggregator.deployed()
-  await changePriceFeed(EA_1_URL, 100)
-  await changePriceFeed(EA_2_URL, 120)
+  await Promise.all([
+    fluxAggregator.deployed(),
+    changePriceFeed(EA_1_URL, 100), // original price
+    changePriceFeed(EA_2_URL, 100),
+  ])
 })
 
 describe('FluxMonitor / FluxAggregator integration with one node', () => {
@@ -199,17 +229,11 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
       'initial update never run by node 2',
     )
 
-    matchers.bigNum(11000, await fluxAggregator.latestAnswer())
-    matchers.bigNum(1, await fluxAggregator.latestRound())
-    matchers.bigNum(1, await fluxAggregator.reportingRound())
-    matchers.bigNum(1, (await fluxAggregator.latestSubmission(node1Address))[1])
-    matchers.bigNum(1, (await fluxAggregator.latestSubmission(node2Address))[1])
-    matchers.bigNum(1, await fluxAggregator.withdrawable(node1Address))
-    matchers.bigNum(1, await fluxAggregator.withdrawable(node2Address))
+    await assertAggregatorValues(10000, 1, 1, 1, 1, 1, 1, 'initial round')
 
     clClient2.pause()
     await changePriceFeed(EA_1_URL, 110)
-    await changePriceFeed(EA_1_URL, 120)
+    await changePriceFeed(EA_2_URL, 120)
 
     await assertJobRun(
       clClient1,
@@ -217,22 +241,7 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
       node1InitialRunCount + 2,
       "node 1's second update not run",
     )
-    // await wait(5000) // allow for node 2 to potentially respond
-    matchers.bigNum(11000, await fluxAggregator.latestAnswer())
-    matchers.bigNum(1, await fluxAggregator.latestRound())
-    matchers.bigNum(2, await fluxAggregator.reportingRound())
-    matchers.bigNum(2, (await fluxAggregator.latestSubmission(node1Address))[1])
-    matchers.bigNum(1, (await fluxAggregator.latestSubmission(node2Address))[1])
-    matchers.bigNum(
-      2,
-      await fluxAggregator.withdrawable(node1Address),
-      "node 1 wasn't paid",
-    )
-    matchers.bigNum(
-      1,
-      await fluxAggregator.withdrawable(node2Address),
-      "node 2 was paid and shouldn't have been",
-    )
+    await assertAggregatorValues(10000, 1, 2, 2, 1, 2, 1, 'node 1 answers')
 
     clClient2.unpause()
 
@@ -242,20 +251,6 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
       node2InitialRunCount + 2,
       "node 2's second update not run",
     )
-    matchers.bigNum(11500, await fluxAggregator.latestAnswer())
-    matchers.bigNum(2, await fluxAggregator.latestRound())
-    matchers.bigNum(2, await fluxAggregator.reportingRound())
-    matchers.bigNum(2, (await fluxAggregator.latestSubmission(node1Address))[1])
-    matchers.bigNum(2, (await fluxAggregator.latestSubmission(node2Address))[1])
-    matchers.bigNum(
-      2,
-      await fluxAggregator.withdrawable(node1Address),
-      "node 1 wasn't paid",
-    )
-    matchers.bigNum(
-      2,
-      await fluxAggregator.withdrawable(node2Address),
-      "node 2 wasn't paid",
-    )
+    await assertAggregatorValues(11500, 2, 2, 2, 2, 2, , 'second round')
   })
 })
