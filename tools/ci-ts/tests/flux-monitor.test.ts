@@ -2,10 +2,11 @@ import { assert } from 'chai'
 import fluxMonitorJob from '../fixtures/flux-monitor-job'
 import {
   assertAsync,
-  getArgs,
-  wait,
   createProvider,
   fundAddress,
+  getArgs,
+  txWait,
+  wait,
 } from '../test-helpers/common'
 import ChainlinkClient from '../test-helpers/chainlink-cli'
 import { contract, helpers as h, matchers } from '@chainlink/test-helpers'
@@ -89,9 +90,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
     await changePriceFeed(100) // original price
   })
 
-  it('updates the price with a single node', async () => {
-    const clClient = new ChainlinkClient(node1URL)
-
+  it('updates the price', async () => {
     fluxAggregator = await fluxAggregatorFactory.deploy(
       linkToken.address,
       1,
@@ -100,18 +99,11 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
       ethers.utils.formatBytes32String('ETH/USD'),
     )
     await fluxAggregator.deployed()
-    const tx1 = await fluxAggregator.addOracle(
-      node1Address,
-      node1Address,
-      1,
-      1,
-      0,
-    )
-    await tx1.wait()
-    const tx2 = await linkToken.transfer(fluxAggregator.address, deposit)
-    await tx2.wait()
-    const tx3 = await fluxAggregator.updateAvailableFunds()
-    await tx3.wait()
+    await fluxAggregator
+      .addOracle(node1Address, node1Address, 1, 1, 0)
+      .then(txWait)
+    await linkToken.transfer(fluxAggregator.address, deposit).then(txWait)
+    await fluxAggregator.updateAvailableFunds().then(txWait)
 
     expect(await fluxAggregator.getOracles()).toEqual([node1Address])
     matchers.bigNum(
@@ -130,7 +122,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 
     // Job should trigger initial FM run
     await assertJobRun(
-      clClient,
+      clClient1,
       job.id,
       initialRunCount + 1,
       'initial job never run',
@@ -149,7 +141,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
     // Significantly change price feed
     await changePriceFeed(110)
     await assertJobRun(
-      clClient,
+      clClient1,
       job.id,
       initialRunCount + 2,
       'second job never run',
@@ -159,7 +151,44 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 })
 
 describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
-  it.skip('works', () => {
-    assert(true)
+  let fluxAggregator: contract.Instance<FluxAggregatorFactory>
+  // let job: JobSpec
+
+  it.only('updates the price', async () => {
+    fluxAggregator = await fluxAggregatorFactory.deploy(
+      linkToken.address,
+      1,
+      3,
+      1,
+      ethers.utils.formatBytes32String('ETH/USD'),
+    )
+    await fluxAggregator.deployed()
+    await fluxAggregator
+      .addOracle(node1Address, node1Address, 1, 1, 0)
+      .then(txWait)
+    await fluxAggregator
+      .addOracle(node2Address, node2Address, 2, 2, 0)
+      .then(txWait)
+    await linkToken.transfer(fluxAggregator.address, deposit).then(txWait)
+    await fluxAggregator.updateAvailableFunds().then(txWait)
+
+    expect(await fluxAggregator.getOracles()).toEqual([
+      node1Address,
+      node2Address,
+    ])
+    matchers.bigNum(
+      await linkToken.balanceOf(fluxAggregator.address),
+      deposit,
+      'Unable to fund FluxAggregator',
+    )
+
+    const node1InitialJobCount = clClient1.getJobs().length
+    const node1InitialRunCount = clClient1.getJobRuns().length
+    const node2InitialJobCount = clClient1.getJobs().length
+    const node2InitialRunCount = clClient1.getJobRuns().length
+    assert.equal(node1InitialJobCount, 0)
+    assert.equal(node1InitialRunCount, 0)
+    assert.equal(node2InitialJobCount, 0)
+    assert.equal(node2InitialRunCount, 0)
   })
 })

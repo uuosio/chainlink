@@ -179,3 +179,7 @@ export async function fundAddress(to: string, ether = 1000) {
   })
   await tx.wait()
 }
+
+export async function txWait(tx: ethers.ContractTransaction): Promise<void> {
+  await tx.wait()
+}
