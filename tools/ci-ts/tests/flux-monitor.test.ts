@@ -16,27 +16,25 @@ import { ethers } from 'ethers'
 
 const NODE_1_URL = 'http://node:6688'
 const NODE_2_URL = 'http://node-2:6688'
-const EXTERNAL_ADAPTER_1_URL = 'http://external-adapter:6644'
-const EXTERNAL_ADAPTER_2_URL = 'http://external-adapter-2:6644'
+const EA_1_URL = 'http://external-adapter:6644'
+const EA_2_URL = 'http://external-adapter-2:6644'
 
 const provider = createProvider()
 const carol = ethers.Wallet.createRandom().connect(provider)
 const linkTokenFactory = new contract.LinkTokenFactory(carol)
 const fluxAggregatorFactory = new FluxAggregatorFactory(carol)
-const adapterURL = new URL('result', EXTERNAL_ADAPTER_1_URL).href
 const deposit = h.toWei('1000')
 const clClient1 = new ChainlinkClient(NODE_1_URL)
 const clClient2 = new ChainlinkClient(NODE_2_URL)
 
-console.log(NODE_2_URL)
-console.log(EXTERNAL_ADAPTER_2_URL)
-
 let linkToken: contract.Instance<contract.LinkTokenFactory>
+let fluxAggregator: contract.Instance<FluxAggregatorFactory>
 let node1Address: string
 let node2Address: string
 
-async function changePriceFeed(value: number) {
-  const response = await fetch(adapterURL, {
+async function changePriceFeed(adapter: string, value: number) {
+  const url = new URL('result', adapter).href
+  const response = await fetch(url, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -77,30 +75,27 @@ beforeAll(async () => {
   await linkToken.deployed()
 })
 
-// describe('test', () => {
-//   it('works', () => {
-//     assert(true)
-//   })
-// })
+beforeEach(async () => {
+  fluxAggregator = await fluxAggregatorFactory.deploy(
+    linkToken.address,
+    1,
+    3,
+    1,
+    ethers.utils.formatBytes32String('ETH/USD'),
+  )
+  await fluxAggregator.deployed()
+  await changePriceFeed(EA_1_URL, 100) // original price
+  await changePriceFeed(EA_2_URL, 100) // original price
+})
 
 describe('FluxMonitor / FluxAggregator integration with one node', () => {
-  let fluxAggregator: contract.Instance<FluxAggregatorFactory>
   let job: JobSpec
 
   afterEach(async () => {
     clClient1.archiveJob(job.id)
-    await changePriceFeed(100) // original price
   })
 
   it('updates the price', async () => {
-    fluxAggregator = await fluxAggregatorFactory.deploy(
-      linkToken.address,
-      1,
-      600,
-      1,
-      ethers.utils.formatBytes32String('ETH/USD'),
-    )
-    await fluxAggregator.deployed()
     await fluxAggregator
       .addOracle(node1Address, node1Address, 1, 1, 0)
       .then(txWait)
@@ -119,7 +114,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 
     // create FM job
     fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
-    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_1_URL]
+    fluxMonitorJob.initiators[0].params.feeds = [EA_1_URL]
     job = clClient1.createJob(JSON.stringify(fluxMonitorJob))
     assert.equal(clClient1.getJobs().length, initialJobCount + 1)
 
@@ -133,7 +128,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
     matchers.bigNum(10000, await fluxAggregator.latestAnswer())
 
     // Nominally change price feed
-    await changePriceFeed(101)
+    await changePriceFeed(EA_1_URL, 101)
     await wait(10000)
     assert.equal(
       clClient1.getJobRuns().length,
@@ -142,7 +137,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
     )
 
     // Significantly change price feed
-    await changePriceFeed(110)
+    await changePriceFeed(EA_1_URL, 110)
     await assertJobRun(
       clClient1,
       job.id,
@@ -154,18 +149,9 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 })
 
 describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
-  let fluxAggregator: contract.Instance<FluxAggregatorFactory>
   // let job: JobSpec
 
-  it.only('updates the price', async () => {
-    fluxAggregator = await fluxAggregatorFactory.deploy(
-      linkToken.address,
-      1,
-      3,
-      1,
-      ethers.utils.formatBytes32String('ETH/USD'),
-    )
-    await fluxAggregator.deployed()
+  it('updates the price', async () => {
     await fluxAggregator
       .addOracle(node1Address, node1Address, 1, 1, 0)
       .then(txWait)
@@ -186,17 +172,33 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     )
 
     const node1InitialJobCount = clClient1.getJobs().length
-    const node1InitialRunCount = clClient1.getJobRuns().length
-    // const node2InitialJobCount = clClient1.getJobs().length
+    // const node1InitialRunCount = clClient1.getJobRuns().length
+    const node2InitialJobCount = clClient1.getJobs().length
     // const node2InitialRunCount = clClient1.getJobRuns().length
 
     // TODO reset flux monitor job b/t tests (re-read from file?)
     fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
-    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_1_URL]
-    clClient1.createJob(JSON.stringify(fluxMonitorJob))
-    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_2_URL]
-    clClient2.createJob(JSON.stringify(fluxMonitorJob))
+    fluxMonitorJob.initiators[0].params.feeds = [EA_1_URL]
+    const job1 = clClient1.createJob(JSON.stringify(fluxMonitorJob))
+    fluxMonitorJob.initiators[0].params.feeds = [EA_2_URL]
+    const job2 = clClient2.createJob(JSON.stringify(fluxMonitorJob))
+
     assert.equal(clClient1.getJobs().length, node1InitialJobCount + 1)
-    assert.equal(clClient2.getJobs().length, node1InitialRunCount + 1)
+    assert.equal(clClient2.getJobs().length, node2InitialJobCount + 1)
+
+    await assertJobRun(
+      clClient1,
+      job1.id,
+      node1InitialJobCount + 1,
+      'initial job never run',
+    )
+    await assertJobRun(
+      clClient2,
+      job2.id,
+      node2InitialJobCount + 1,
+      'initial job never run',
+    )
+
+    matchers.bigNum(10000, await fluxAggregator.latestAnswer())
   })
 })
