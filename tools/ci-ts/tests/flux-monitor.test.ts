@@ -4,7 +4,6 @@ import {
   assertAsync,
   createProvider,
   fundAddress,
-  getArgs,
   txWait,
   wait,
 } from '../test-helpers/common'
@@ -15,19 +14,22 @@ import { JobSpec } from '../../../operator_ui/@types/operator_ui'
 import 'isomorphic-unfetch'
 import { ethers } from 'ethers'
 
-const [node1URL, node2URL] = ['http://node:6688', 'http://node-2:6688']
-const { EXTERNAL_ADAPTER_URL } = getArgs(['EXTERNAL_ADAPTER_URL'])
+const NODE_1_URL = 'http://node:6688'
+const NODE_2_URL = 'http://node-2:6688'
+const EXTERNAL_ADAPTER_1_URL = 'http://external-adapter:6644'
+const EXTERNAL_ADAPTER_2_URL = 'http://external-adapter-2:6644'
 
 const provider = createProvider()
 const carol = ethers.Wallet.createRandom().connect(provider)
 const linkTokenFactory = new contract.LinkTokenFactory(carol)
 const fluxAggregatorFactory = new FluxAggregatorFactory(carol)
-const adapterURL = new URL('result', EXTERNAL_ADAPTER_URL).href
+const adapterURL = new URL('result', EXTERNAL_ADAPTER_1_URL).href
 const deposit = h.toWei('1000')
-const clClient1 = new ChainlinkClient(node1URL)
-const clClient2 = new ChainlinkClient(node2URL)
+const clClient1 = new ChainlinkClient(NODE_1_URL)
+const clClient2 = new ChainlinkClient(NODE_2_URL)
 
-console.log(node2URL)
+console.log(NODE_2_URL)
+console.log(EXTERNAL_ADAPTER_2_URL)
 
 let linkToken: contract.Instance<contract.LinkTokenFactory>
 let node1Address: string
@@ -117,6 +119,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 
     // create FM job
     fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
+    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_1_URL]
     job = clClient1.createJob(JSON.stringify(fluxMonitorJob))
     assert.equal(clClient1.getJobs().length, initialJobCount + 1)
 
@@ -184,11 +187,16 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
 
     const node1InitialJobCount = clClient1.getJobs().length
     const node1InitialRunCount = clClient1.getJobRuns().length
-    const node2InitialJobCount = clClient1.getJobs().length
-    const node2InitialRunCount = clClient1.getJobRuns().length
-    assert.equal(node1InitialJobCount, 0)
-    assert.equal(node1InitialRunCount, 0)
-    assert.equal(node2InitialJobCount, 0)
-    assert.equal(node2InitialRunCount, 0)
+    // const node2InitialJobCount = clClient1.getJobs().length
+    // const node2InitialRunCount = clClient1.getJobRuns().length
+
+    // TODO reset flux monitor job b/t tests (re-read from file?)
+    fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
+    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_1_URL]
+    clClient1.createJob(JSON.stringify(fluxMonitorJob))
+    fluxMonitorJob.initiators[0].params.feeds = [EXTERNAL_ADAPTER_2_URL]
+    clClient2.createJob(JSON.stringify(fluxMonitorJob))
+    assert.equal(clClient1.getJobs().length, node1InitialJobCount + 1)
+    assert.equal(clClient2.getJobs().length, node1InitialRunCount + 1)
   })
 })

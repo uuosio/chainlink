@@ -10,7 +10,7 @@ export default {
             market: 'USD',
           },
         },
-        feeds: ['http://external-adapter:6644'],
+        feeds: [''],
         threshold: 5,
         pollingInterval: '5s',
         precision: 2,
