@@ -79,7 +79,7 @@ beforeEach(async () => {
   fluxAggregator = await fluxAggregatorFactory.deploy(
     linkToken.address,
     1,
-    3,
+    30,
     1,
     ethers.utils.formatBytes32String('ETH/USD'),
   )
@@ -172,9 +172,9 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     )
 
     const node1InitialJobCount = clClient1.getJobs().length
-    // const node1InitialRunCount = clClient1.getJobRuns().length
-    const node2InitialJobCount = clClient1.getJobs().length
-    // const node2InitialRunCount = clClient1.getJobRuns().length
+    const node1InitialRunCount = clClient1.getJobRuns().length
+    const node2InitialJobCount = clClient2.getJobs().length
+    const node2InitialRunCount = clClient2.getJobRuns().length
 
     // TODO reset flux monitor job b/t tests (re-read from file?)
     fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
@@ -189,16 +189,34 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     await assertJobRun(
       clClient1,
       job1.id,
-      node1InitialJobCount + 1,
+      node1InitialRunCount + 1,
       'initial job never run',
     )
     await assertJobRun(
       clClient2,
       job2.id,
-      node2InitialJobCount + 1,
+      node2InitialRunCount + 1,
       'initial job never run',
     )
 
     matchers.bigNum(10000, await fluxAggregator.latestAnswer())
+
+    await changePriceFeed(EA_1_URL, 110)
+    await assertJobRun(
+      clClient1,
+      job1.id,
+      node1InitialRunCount + 2,
+      'initial job never run',
+    )
+    matchers.bigNum(10000, await fluxAggregator.latestAnswer())
+
+    await changePriceFeed(EA_2_URL, 120)
+    await assertJobRun(
+      clClient1,
+      job1.id,
+      node2InitialRunCount + 2,
+      'initial job never run',
+    )
+    matchers.bigNum(11500, await fluxAggregator.latestAnswer())
   })
 })
