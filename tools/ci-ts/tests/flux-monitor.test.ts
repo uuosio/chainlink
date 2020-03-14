@@ -186,9 +186,7 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
       'Unable to fund FluxAggregator',
     )
 
-    const node1InitialJobCount = clClient1.getJobs().length
     const node1InitialRunCount = clClient1.getJobRuns().length
-    const node2InitialJobCount = clClient2.getJobs().length
     const node2InitialRunCount = clClient2.getJobRuns().length
 
     // TODO reset flux monitor job b/t tests (re-read from file?)
@@ -197,9 +195,6 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     clClient1.createJob(JSON.stringify(fluxMonitorJob))
     fluxMonitorJob.initiators[0].params.feeds = [EA_2_URL]
     clClient2.createJob(JSON.stringify(fluxMonitorJob))
-
-    assert.equal(clClient1.getJobs().length, node1InitialJobCount + 1)
-    assert.equal(clClient2.getJobs().length, node2InitialJobCount + 1)
 
     // initial job run
     await assertJobRun(clClient1, node1InitialRunCount + 1, 'initial update')
