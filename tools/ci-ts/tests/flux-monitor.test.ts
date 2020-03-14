@@ -26,8 +26,8 @@ const carol = ethers.Wallet.createRandom().connect(provider)
 const linkTokenFactory = new contract.LinkTokenFactory(carol)
 const fluxAggregatorFactory = new FluxAggregatorFactory(carol)
 const deposit = h.toWei('1000')
-const clClient1 = new ChainlinkClient(NODE_1_URL, NODE_1_CONTAINER)
-const clClient2 = new ChainlinkClient(NODE_2_URL, NODE_2_CONTAINER)
+const clClient1 = new ChainlinkClient('node 1', NODE_1_URL, NODE_1_CONTAINER)
+const clClient2 = new ChainlinkClient('node 2', NODE_2_URL, NODE_2_CONTAINER)
 
 let linkToken: contract.Instance<contract.LinkTokenFactory>
 let fluxAggregator: contract.Instance<FluxAggregatorFactory>
@@ -48,30 +48,25 @@ async function changePriceFeed(adapter: string, value: number) {
 
 async function assertJobRun(
   clClient: ChainlinkClient,
-  jobId: string,
   count: number,
   errorMessage: string,
 ) {
   await assertAsync(() => {
     const jobRuns = clClient.getJobRuns()
     const jobRun = jobRuns[jobRuns.length - 1]
-    return (
-      clClient.getJobRuns().length === count &&
-      jobRun.status === 'completed' &&
-      jobRun.jobId === jobId
-    )
-  }, errorMessage)
+    return jobRuns.length === count && jobRun.status === 'completed'
+  }, `${errorMessage} : job not run on ${clClient.name}`)
 }
 
 async function assertAggregatorValues(
-  _la: number,
-  _lr: number,
-  _rr: number,
-  _ls1: number,
-  _ls2: number,
-  _w1: number,
-  _w2: number,
-  message: string,
+  latestAnswer: number,
+  latestRound: number,
+  reportingRound: number,
+  latestSubmission1: number,
+  latestSubmission2: number,
+  withdrawable1: number,
+  withdrawable2: number,
+  msg: string,
 ): Promise<void> {
   const [la, lr, rr, ls1, ls2, w1, w2] = await Promise.all([
     fluxAggregator.latestAnswer(),
@@ -82,13 +77,13 @@ async function assertAggregatorValues(
     fluxAggregator.withdrawable(node1Address),
     fluxAggregator.withdrawable(node2Address),
   ])
-  matchers.bigNum(_la, la, `${message}: latest answer`)
-  matchers.bigNum(_lr, lr, `${message}: latest round`)
-  matchers.bigNum(_rr, rr, `${message}: reporting round`)
-  matchers.bigNum(_ls1, ls1, `${message}: node 1 latest submission`)
-  matchers.bigNum(_ls2, ls2, `${message}: node 2 latest submission`)
-  matchers.bigNum(_w1, w1, `${message}: node 1 withdrawable amount`)
-  matchers.bigNum(_w2, w2, `${message}: node 2 withdrawable amount`)
+  matchers.bigNum(latestAnswer, la, `${msg} : latest answer`)
+  matchers.bigNum(latestRound, lr, `${msg} : latest round`)
+  matchers.bigNum(reportingRound, rr, `${msg} : reporting round`)
+  matchers.bigNum(latestSubmission1, ls1, `${msg} : node 1 latest submission`)
+  matchers.bigNum(latestSubmission2, ls2, `${msg} : node 2 latest submission`)
+  matchers.bigNum(withdrawable1, w1, `${msg} : node 1 withdrawable amount`)
+  matchers.bigNum(withdrawable2, w2, `${msg} : node 2 withdrawable amount`)
 }
 
 beforeAll(async () => {
@@ -149,12 +144,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
     assert.equal(clClient1.getJobs().length, initialJobCount + 1)
 
     // Job should trigger initial FM run
-    await assertJobRun(
-      clClient1,
-      job.id,
-      initialRunCount + 1,
-      'initial job never run',
-    )
+    await assertJobRun(clClient1, initialRunCount + 1, 'initial update')
     matchers.bigNum(10000, await fluxAggregator.latestAnswer())
 
     // Nominally change price feed
@@ -168,12 +158,7 @@ describe('FluxMonitor / FluxAggregator integration with one node', () => {
 
     // Significantly change price feed
     await changePriceFeed(EA_1_URL, 110)
-    await assertJobRun(
-      clClient1,
-      job.id,
-      initialRunCount + 2,
-      'second job never run',
-    )
+    await assertJobRun(clClient1, initialRunCount + 2, 'second update')
     matchers.bigNum(11000, await fluxAggregator.latestAnswer())
   })
 })
@@ -209,48 +194,28 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     // TODO reset flux monitor job b/t tests (re-read from file?)
     fluxMonitorJob.initiators[0].params.address = fluxAggregator.address
     fluxMonitorJob.initiators[0].params.feeds = [EA_1_URL]
-    const job1 = clClient1.createJob(JSON.stringify(fluxMonitorJob))
+    clClient1.createJob(JSON.stringify(fluxMonitorJob))
     fluxMonitorJob.initiators[0].params.feeds = [EA_2_URL]
-    const job2 = clClient2.createJob(JSON.stringify(fluxMonitorJob))
+    clClient2.createJob(JSON.stringify(fluxMonitorJob))
 
     assert.equal(clClient1.getJobs().length, node1InitialJobCount + 1)
     assert.equal(clClient2.getJobs().length, node2InitialJobCount + 1)
 
-    await assertJobRun(
-      clClient1,
-      job1.id,
-      node1InitialRunCount + 1,
-      'initial update never run by node 1',
-    )
-    await assertJobRun(
-      clClient2,
-      job2.id,
-      node2InitialRunCount + 1,
-      'initial update never run by node 2',
-    )
-
+    // initial job run
+    await assertJobRun(clClient1, node1InitialRunCount + 1, 'initial update')
+    await assertJobRun(clClient2, node2InitialRunCount + 1, 'initial update')
     await assertAggregatorValues(10000, 1, 1, 1, 1, 1, 1, 'initial round')
 
+    // node 1 should still begin round even with unresponsive node 2
     clClient2.pause()
     await changePriceFeed(EA_1_URL, 110)
     await changePriceFeed(EA_2_URL, 120)
+    await assertJobRun(clClient1, node1InitialRunCount + 2, 'second update')
+    await assertAggregatorValues(10000, 1, 2, 2, 1, 2, 1, 'node 1 only')
 
-    await assertJobRun(
-      clClient1,
-      job1.id,
-      node1InitialRunCount + 2,
-      "node 1's second update not run",
-    )
-    await assertAggregatorValues(10000, 1, 2, 2, 1, 2, 1, 'node 1 answers')
-
+    // node 2 should finish round
     clClient2.unpause()
-
-    await assertJobRun(
-      clClient2,
-      job2.id,
-      node2InitialRunCount + 2,
-      "node 2's second update not run",
-    )
-    await assertAggregatorValues(11500, 2, 2, 2, 2, 2, , 'second round')
+    await assertJobRun(clClient2, node2InitialRunCount + 2, 'second update')
+    await assertAggregatorValues(11500, 2, 2, 2, 2, 2, 2, 'second round')
   })
 })
