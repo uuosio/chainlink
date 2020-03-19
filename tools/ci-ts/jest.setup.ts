@@ -6,6 +6,10 @@ const { CHAINLINK_URL, EXTERNAL_ADAPTER_URL } = getArgs([
 ])
 
 beforeAll(async () => {
-  await waitForService(CHAINLINK_URL)
-  await waitForService(EXTERNAL_ADAPTER_URL)
+  await Promise.all([
+    waitForService(CHAINLINK_URL),
+    waitForService('http://node-2:6688'),
+    waitForService(EXTERNAL_ADAPTER_URL),
+    waitForService('http://external-adapter-2:6644'),
+  ])
 })
