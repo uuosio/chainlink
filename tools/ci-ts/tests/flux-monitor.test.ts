@@ -8,7 +8,7 @@ import {
   txWait,
   wait,
 } from '../test-helpers/common'
-import ChainlinkClient from '../test-helpers/chainlink-cli'
+import ChainlinkClient from '../test-helpers/chainlinkClient'
 import { contract, helpers as h, matchers } from '@chainlink/test-helpers'
 import { FluxAggregatorFactory } from '@chainlink/contracts/ethers/v0.6/FluxAggregatorFactory'
 import 'isomorphic-unfetch'
