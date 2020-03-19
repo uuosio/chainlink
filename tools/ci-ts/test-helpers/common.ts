@@ -1,4 +1,3 @@
-import chalk from 'chalk'
 import { ethers } from 'ethers'
 import 'source-map-support/register'
 
@@ -24,7 +23,6 @@ export const GETH_DEV_ADDRESS = '0x7db75251a74f40b15631109ba44d33283ed48528'
 export function createProvider(): ethers.providers.JsonRpcProvider {
   const port = process.env.ETH_HTTP_PORT || `18545`
   const providerURL = process.env.ETH_HTTP_URL || `http://localhost:${port}`
-
   return new ethers.providers.JsonRpcProvider(providerURL)
 }
 
@@ -65,40 +63,6 @@ export function getArgs<T extends string>(keys: T[]): { [K in T]: string } {
     prev[next] = envVar
     return prev
   }, {} as { [K in T]: string })
-}
-
-/**
- * Registers a global promise handler that will exit the currently
- * running process if an unhandled promise rejection is caught
- */
-export function registerPromiseHandler() {
-  process.on('unhandledRejection', e => {
-    console.error(e)
-    console.error(chalk.red('Exiting due to promise rejection'))
-    process.exit(1)
-  })
-}
-
-interface DeployFactory {
-  new (signer?: ethers.Signer): ethers.ContractFactory
-}
-
-interface DeployContractArgs<T extends DeployFactory> {
-  Factory: T
-  name: string
-  signer: ethers.Signer
-}
-
-export async function deployContract<T extends DeployFactory>(
-  { Factory, name, signer }: DeployContractArgs<T>,
-  ...deployArgs: Parameters<InstanceType<T>['deploy']>
-): Promise<ReturnType<InstanceType<T>['deploy']>> {
-  const contractFactory = new Factory(signer)
-  const contract = await contractFactory.deploy(...deployArgs)
-  await contract.deployed()
-  console.log(`Deployed ${name} at: ${contract.address}`)
-
-  return contract as any
 }
 
 export async function wait(ms: number) {
