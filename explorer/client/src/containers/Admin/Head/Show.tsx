@@ -14,7 +14,7 @@ import Head from '../../../components/Admin/Heads/Head'
 import { fetchAdminHead } from '../../../actions/adminHeads'
 import { AppState } from '../../../reducers'
 import { HeadShowData } from '../../../reducers/adminHeadsShow'
-import { DispatchBinding } from '../../../utils/types'
+import { DispatchBinding } from '@chainlink/ts-helpers'
 
 const styles = ({ breakpoints, spacing }: Theme) =>
   createStyles({
