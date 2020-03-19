@@ -1,12 +1,13 @@
 import { assert } from 'chai'
 import _fluxMonitorJob from '../fixtures/flux-monitor-job'
 import {
-  assertAsync,
   createProvider,
   fundAddress,
   getArgs,
   txWait,
   wait,
+  changePriceFeed,
+  assertJobRun,
 } from '../test-helpers/common'
 import ChainlinkClient from '../test-helpers/chainlinkClient'
 import { contract, helpers as h, matchers } from '@chainlink/test-helpers'
@@ -53,30 +54,6 @@ let linkToken: contract.Instance<contract.LinkTokenFactory>
 let fluxAggregator: contract.Instance<FluxAggregatorFactory>
 let node1Address: string
 let node2Address: string
-
-async function changePriceFeed(adapter: string, value: number) {
-  const url = new URL('result', adapter).href
-  const response = await fetch(url, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ result: value }),
-  })
-  assert(response.ok)
-}
-
-async function assertJobRun(
-  clClient: ChainlinkClient,
-  count: number,
-  errorMessage: string,
-) {
-  await assertAsync(() => {
-    const jobRuns = clClient.getJobRuns()
-    const jobRun = jobRuns[jobRuns.length - 1]
-    return jobRuns.length === count && jobRun.status === 'completed'
-  }, `${errorMessage} : job not run on ${clClient.name}`)
-}
 
 async function assertAggregatorValues(
   latestAnswer: number,
@@ -228,7 +205,7 @@ describe('FluxMonitor / FluxAggregator integration with two nodes', () => {
     await assertJobRun(clClient2, node2InitialRunCount + 2, 'second update')
     await assertAggregatorValues(11500, 2, 2, 2, 2, 'second round')
 
-    // TODO - make separate test?
+    // reduce minAnswers to 1
     await clClient2.pause()
     await fluxAggregator.updateFutureRounds(1, 1, 2, 0, 5)
     await changePriceFeed(EXTERNAL_ADAPTER_URL, 130)

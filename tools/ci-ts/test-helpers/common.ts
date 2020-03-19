@@ -1,4 +1,7 @@
 import { ethers } from 'ethers'
+import { ContractReceipt } from 'ethers/contract'
+import { assert } from 'chai'
+import ChainlinkClient from './chainlinkClient'
 import 'source-map-support/register'
 
 /**
@@ -72,6 +75,24 @@ export async function wait(ms: number) {
 }
 
 /**
+ * changePriceFeed makes a patch request to the external adapter in tools/external-adapter
+ * and changes the value reported
+ * @param adapter the URL of the external adapter
+ * @param value the value to set on the adapter
+ */
+export async function changePriceFeed(adapter: string, value: number) {
+  const url = new URL('result', adapter).href
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ result: value }),
+  })
+  assert(response.ok)
+}
+
+/**
  * Makes a simple get request to an endpoint and ensures the service responds.
  * Status code doesn't matter - just ensures the service is running.
  * @param endpoint the url of the service
@@ -128,6 +149,29 @@ export async function assertAsync(
   })
 }
 
+/**
+ * assertJobRun continuously checks the CL node for the completion of a job
+ * before resolving
+ * @param clClient the chainlink client instance
+ * @param count the expected number of job runs
+ * @param errorMessage error message to throw
+ */
+export async function assertJobRun(
+  clClient: ChainlinkClient,
+  count: number,
+  errorMessage: string,
+) {
+  await assertAsync(() => {
+    const jobRuns = clClient.getJobRuns()
+    const jobRun = jobRuns[jobRuns.length - 1]
+    return jobRuns.length === count && jobRun.status === 'completed'
+  }, `${errorMessage} : job not run on ${clClient.name}`)
+}
+
+/**
+ * fundAddress sends 1000 eth to the address provided from the default account
+ * @param to address to fund
+ */
 export async function fundAddress(to: string, ether = 1000) {
   const gethMode = !!process.env.GETH_MODE || false
   const provider = createProvider()
@@ -144,6 +188,8 @@ export async function fundAddress(to: string, ether = 1000) {
   await tx.wait()
 }
 
-export async function txWait(tx: ethers.ContractTransaction): Promise<void> {
-  await tx.wait()
+export async function txWait(
+  tx: ethers.ContractTransaction,
+): Promise<ContractReceipt> {
+  return await tx.wait()
 }
