@@ -59,6 +59,7 @@ type ChainlinkApplication struct {
 	services.RunManager
 	RunQueue                 services.RunQueue
 	JobSubscriber            services.JobSubscriber
+	GasUpdater               services.GasUpdater
 	FluxMonitor              fluxmonitor.Service
 	Scheduler                *services.Scheduler
 	Store                    *store.Store
@@ -82,12 +83,14 @@ func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application))
 	runQueue := services.NewRunQueue(runExecutor)
 	runManager := services.NewRunManager(runQueue, config, store.ORM, statsPusher, store.TxManager, store.Clock)
 	jobSubscriber := services.NewJobSubscriber(store, runManager)
+	gasUpdater := services.NewGasUpdater(store)
 	fluxMonitor := fluxmonitor.New(store, runManager)
 
 	pendingConnectionResumer := newPendingConnectionResumer(runManager)
 
 	app := &ChainlinkApplication{
 		JobSubscriber:            jobSubscriber,
+		GasUpdater:               gasUpdater,
 		FluxMonitor:              fluxMonitor,
 		StatsPusher:              statsPusher,
 		RunManager:               runManager,
@@ -102,6 +105,7 @@ func NewApplication(config *orm.Config, onConnectCallbacks ...func(Application))
 	headTrackables := []strpkg.HeadTrackable{
 		store.TxManager,
 		jobSubscriber,
+		gasUpdater,
 		pendingConnectionResumer,
 	}
 	for _, onConnectCallback := range onConnectCallbacks {
